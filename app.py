@@ -199,14 +199,14 @@ def main():
         with col1:
             from_date = st.date_input(
                 "From Date",
-                datetime(2025, 1, 31).date(),
+                datetime(2025, 1, 30).date(),
                 min_value=datetime(2024, 1, 1).date(),
                 max_value=datetime(2025, 12, 31).date()
             )
         with col2:
             to_date = st.date_input(
                 "To Date",
-                datetime(2025, 1, 31).date(),
+                datetime(2025, 1, 30).date(),
                 min_value=datetime(2024, 1, 1).date(),
                 max_value=datetime(2025, 12, 31).date()
             )
