@@ -6,17 +6,20 @@ from breeze_connect import BreezeConnect
 import os
 from dotenv import load_dotenv
 import logging
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class OptionDataFetcher:
-    def __init__(self):
+    def __init__(self, symbol, expiry_date):
         """Initialize the Breeze API connection"""
         load_dotenv()
         self.breeze = None
         self.is_connected = False
+        self.symbol = symbol
+        self.expiry_date = expiry_date
         self.connect()
 
     def connect(self):
@@ -55,15 +58,13 @@ class OptionDataFetcher:
             st.error(f"Error connecting to Breeze API: {str(e)}")
             return False
 
-    def get_historical_data(self, symbol, strike_price, right, expiry_date, from_date, to_date, interval="1minute"):
+    def get_historical_data(self, strike_price, right, from_date, to_date, interval="1minute"):
         """
         Get historical option data
         
         Args:
-            symbol: Stock/Index symbol (e.g., "NIFTY")
             strike_price: Strike price of the option
             right: Option type ("call" or "put")
-            expiry_date: Expiry date in YYYY-MM-DD format
             from_date: Start date in YYYY-MM-DD format
             to_date: End date in YYYY-MM-DD format
             interval: Data interval ("1minute" or "5minute")
@@ -79,19 +80,19 @@ class OptionDataFetcher:
             # Convert dates to API format
             from_datetime = datetime.strptime(from_date, "%Y-%m-%d")
             to_datetime = datetime.strptime(to_date, "%Y-%m-%d") + timedelta(days=1)
-            expiry_datetime = datetime.strptime(expiry_date, "%Y-%m-%d")
+            expiry_datetime = self.expiry_date
             
             # Format dates for API
             from_date_str = from_datetime.strftime("%Y-%m-%dT07:00:00.000Z")
             to_date_str = to_datetime.strftime("%Y-%m-%dT07:00:00.000Z")
-            expiry_date_str = expiry_datetime.strftime("%Y-%m-%dT07:00:00.000Z")
+            expiry_date_str = expiry_datetime.strftime("%Y-%m-%d")
             
             # Get historical data
             hist_data = self.breeze.get_historical_data_v2(
                 interval=interval,
                 from_date=from_date_str,
                 to_date=to_date_str,
-                stock_code=symbol,
+                stock_code=self.symbol,
                 exchange_code="NFO",
                 product_type="options",
                 expiry_date=expiry_date_str,
@@ -119,6 +120,59 @@ class OptionDataFetcher:
         except Exception as e:
             st.error(f"Error getting historical data: {str(e)}")
             return None
+
+    def get_current_market_price(self):
+        """Get current market price for the symbol"""
+        try:
+            if self.symbol == "NIFTY":
+                quote = self.breeze.get_quote(stock_code="NIFTY", exchange_code="NFO", expiry=self.expiry_date.strftime("%Y-%m-%d"))
+            else:  # BANKNIFTY
+                quote = self.breeze.get_quote(stock_code="BANKNIFTY", exchange_code="NFO", expiry=self.expiry_date.strftime("%Y-%m-%d"))
+            return float(quote['ltp'])
+        except Exception as e:
+            logger.error(f"Error getting market price: {e}")
+            return None
+
+    def get_atm_strike(self):
+        """Get ATM strike price based on current market price"""
+        current_price = self.get_current_market_price()
+        if current_price is None:
+            return None
+        
+        # Round to nearest strike
+        strike_diff = 50 if self.symbol == "NIFTY" else 100
+        atm_strike = round(current_price / strike_diff) * strike_diff
+        return atm_strike
+
+    def get_live_atm_data(self):
+        """Get live data for ATM CE and PE options"""
+        atm_strike = self.get_atm_strike()
+        if atm_strike is None:
+            return None, None
+
+        try:
+            # Get CE data
+            ce_data = self.breeze.get_quote(
+                stock_code=f"{self.symbol}",
+                exchange_code="NFO",
+                expiry=self.expiry_date.strftime("%Y-%m-%d"),
+                strike_price=atm_strike,
+                right="CE"
+            )
+            
+            # Get PE data
+            pe_data = self.breeze.get_quote(
+                stock_code=f"{self.symbol}",
+                exchange_code="NFO",
+                expiry=self.expiry_date.strftime("%Y-%m-%d"),
+                strike_price=atm_strike,
+                right="PE"
+            )
+            
+            return ce_data, pe_data
+        except Exception as e:
+            logger.error(f"Error getting live ATM data: {e}")
+            return None, None
 
 def plot_candlestick(df, title):
     """Create a candlestick chart using plotly"""
@@ -171,14 +225,18 @@ def main():
     st.title("Option Chain Candlestick Charts")
     
     # Initialize data fetcher
-    data_fetcher = OptionDataFetcher()
+    symbol = st.selectbox("Select Symbol", ["NIFTY", "BANKNIFTY"], index=0)
+    expiry_date = st.date_input(
+        "Expiry Date",
+        datetime(2025, 2, 6).date(),
+        min_value=datetime(2024, 1, 1).date(),
+        max_value=datetime(2025, 12, 31).date()
+    )
+    data_fetcher = OptionDataFetcher(symbol, expiry_date)
     
     # Create sidebar inputs
     with st.sidebar:
         st.header("Chart Settings")
-        
-        # Symbol selection
-        symbol = st.selectbox("Select Symbol", ["NIFTY", "BANKNIFTY"], index=0)
         
         # Date range selection
         col1, col2 = st.columns(2)
@@ -203,14 +261,6 @@ def main():
         # Option type selection
         option_type = st.radio("Option Type", ["CE", "PE"], horizontal=True)
         
-        # Expiry date selection
-        expiry_date = st.date_input(
-            "Expiry Date",
-            datetime(2025, 2, 6).date(),
-            min_value=datetime(2024, 1, 1).date(),
-            max_value=datetime(2025, 12, 31).date()
-        )
-        
         # Interval selection
         interval = st.selectbox("Interval", ["1minute", "5minute"], index=0)
         
@@ -221,10 +271,8 @@ def main():
     if fetch_button:
         with st.spinner('Fetching data...'):
             df = data_fetcher.get_historical_data(
-                symbol=symbol,
                 strike_price=strike_price,
                 right="call" if option_type == "CE" else "put",
-                expiry_date=expiry_date.strftime("%Y-%m-%d"),
                 from_date=from_date.strftime("%Y-%m-%d"),
                 to_date=to_date.strftime("%Y-%m-%d"),
                 interval=interval
@@ -241,6 +289,61 @@ def main():
                 # Display data table
                 st.subheader("Data Table")
                 st.dataframe(df.sort_values('datetime', ascending=False), use_container_width=True)
+
+    # Add live ATM options chart button
+    if st.button("Show Live ATM Options"):
+        atm_strike = data_fetcher.get_atm_strike()
+        if atm_strike:
+            st.write(f"Current ATM Strike: {atm_strike}")
+            
+            # Create placeholder for live chart
+            chart_placeholder = st.empty()
+            
+            # Initialize data for both CE and PE
+            ce_data = {'time': [], 'price': []}
+            pe_data = {'time': [], 'price': []}
+            
+            # Create figure
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=[], y=[], name='CE', line=dict(color='green')))
+            fig.add_trace(go.Scatter(x=[], y=[], name='PE', line=dict(color='red')))
+            
+            fig.update_layout(
+                title=f"{symbol} ATM {atm_strike} Live Options Chart",
+                xaxis_title="Time",
+                yaxis_title="Price",
+                height=500
+            )
+            
+            # Update function for live data
+            while True:
+                try:
+                    ce_quote, pe_quote = data_fetcher.get_live_atm_data()
+                    if ce_quote and pe_quote:
+                        current_time = datetime.now().strftime("%H:%M:%S")
+                        
+                        # Update CE data
+                        ce_data['time'].append(current_time)
+                        ce_data['price'].append(float(ce_quote['ltp']))
+                        
+                        # Update PE data
+                        pe_data['time'].append(current_time)
+                        pe_data['price'].append(float(pe_quote['ltp']))
+                        
+                        # Update traces
+                        fig.data[0].x = ce_data['time'][-50:]  # Keep last 50 points
+                        fig.data[0].y = ce_data['price'][-50:]
+                        fig.data[1].x = pe_data['time'][-50:]
+                        fig.data[1].y = pe_data['price'][-50:]
+                        
+                        # Update chart
+                        chart_placeholder.plotly_chart(fig, use_container_width=True)
+                        
+                        # Wait for 1 second before next update
+                        time.sleep(1)
+                except Exception as e:
+                    st.error(f"Error updating live data: {e}")
+                    break
 
 if __name__ == "__main__":
     main()
