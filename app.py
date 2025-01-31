@@ -6,14 +6,10 @@ from breeze_connect import BreezeConnect
 import os
 from dotenv import load_dotenv
 import logging
-from flask import Flask, request, jsonify
-from flask_login import login_required
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-app = Flask(__name__)
 
 class OptionDataFetcher:
     def __init__(self):
@@ -170,47 +166,6 @@ def plot_candlestick(df, title):
     
     return fig
 
-@app.route('/api/option-data', methods=['POST'])
-@login_required
-def get_option_data():
-    data = request.get_json()
-    
-    try:
-        fetcher = OptionDataFetcher()
-        df = fetcher.get_historical_data(
-            symbol=data['symbol'],
-            strike_price=float(data['strike']),
-            right=data['optionType'],
-            expiry_date=data['expiry'],
-            from_date=data['fromDate'],
-            to_date=data['toDate']
-        )
-        
-        if df is None:
-            return jsonify({'error': 'Failed to fetch data'}), 400
-            
-        # Create candlestick chart data
-        chart_data = {
-            'data': [{
-                'x': df.index,
-                'open': df['open'],
-                'high': df['high'],
-                'low': df['low'],
-                'close': df['close'],
-                'type': 'candlestick',
-                'name': f"{data['symbol']} {data['strike']} {data['optionType'].upper()}"
-            }],
-            'layout': {
-                'title': f"{data['symbol']} Option Chart",
-                'yaxis': {'title': 'Price'},
-                'xaxis': {'title': 'Date'}
-            }
-        }
-        
-        return jsonify(chart_data)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 def main():
     st.set_page_config(page_title="Option Chain Charts", layout="wide")
     st.title("Option Chain Candlestick Charts")
@@ -270,4 +225,4 @@ def main():
                 st.dataframe(df.sort_values('datetime', ascending=False), use_container_width=True)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    main()
