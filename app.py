@@ -169,6 +169,9 @@ def plot_candlestick(df, title):
 def main():
     st.set_page_config(page_title="Option Chain Charts", layout="wide")
     st.title("Option Chain Candlestick Charts")
+    st.write("By Abhishek Gogna - Professional Algo-Based Quantitative Research Analyst")
+    st.write("abhishekgogna36@gmail.com")
+    
     
     # Initialize data fetcher
     data_fetcher = OptionDataFetcher()
