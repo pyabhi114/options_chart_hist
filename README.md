@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Option Chain Charts
 
 A Streamlit web application for visualizing option chain data using candlestick charts.
@@ -57,3 +58,7 @@ The app will be available at http://localhost:8501
    - Open Interest line (far right axis)
 
 4. Below the chart, you'll find a data table with all the fetched data
+=======
+# options_chart_hist
+To get 1min and 5min options historical data
+>>>>>>> 38a9a1e991baa755718dd4d45c59c5726ee0409f
