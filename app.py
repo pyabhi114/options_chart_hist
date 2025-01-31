@@ -181,17 +181,35 @@ def main():
         symbol = st.selectbox("Select Symbol", ["NIFTY", "BANKNIFTY"], index=0)
         
         # Date range selection
-        from_date = st.date_input("From Date", datetime.now() - timedelta(days=5))
-        to_date = st.date_input("To Date", datetime.now())
-        
+        col1, col2 = st.columns(2)
+        with col1:
+            from_date = st.date_input(
+                "From Date",
+                datetime(2025, 1, 31).date(),
+                min_value=datetime(2024, 1, 1).date(),
+                max_value=datetime(2025, 12, 31).date()
+            )
+        with col2:
+            to_date = st.date_input(
+                "To Date",
+                datetime(2025, 1, 31).date(),
+                min_value=datetime(2024, 1, 1).date(),
+                max_value=datetime(2025, 12, 31).date()
+            )
+
         # Strike price input
-        strike_price = st.number_input("Strike Price", min_value=15000, max_value=25000, value=20000, step=50)
-        
+        strike_price = st.number_input("Strike Price", value=23400, step=100)
+
         # Option type selection
         option_type = st.radio("Option Type", ["CE", "PE"], horizontal=True)
         
-        # Expiry date selection (you might want to make this dynamic based on available expiries)
-        expiry_date = st.date_input("Expiry Date", datetime.now() + timedelta(days=30))
+        # Expiry date selection
+        expiry_date = st.date_input(
+            "Expiry Date",
+            datetime(2025, 2, 6).date(),
+            min_value=datetime(2024, 1, 1).date(),
+            max_value=datetime(2025, 12, 31).date()
+        )
         
         # Interval selection
         interval = st.selectbox("Interval", ["1minute", "5minute"], index=0)
