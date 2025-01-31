@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def main():
-    st.title("Live ATM Options Monitor")
+    st.title("Live ATM Options Monitor (under development)")
     st.write("Monitor real-time ATM Call and Put options prices")
     
     # Initialize inputs
