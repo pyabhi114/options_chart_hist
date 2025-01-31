@@ -6,7 +6,6 @@ from breeze_connect import BreezeConnect
 import os
 from dotenv import load_dotenv
 import logging
-import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,36 +24,26 @@ class OptionDataFetcher:
     def connect(self):
         """Connect to Breeze API"""
         try:
-            # Load environment variables
+            # Get credentials from environment variables
             api_key = os.getenv("API_KEY")
             api_secret = os.getenv("API_SECRET")
-            
-            if not api_key or not api_secret:
-                st.error("API credentials not found in environment variables")
-                return False
-            
+            user_id = os.getenv("USER_ID")
+            password = os.getenv("PASSWORD")
+            google_auth_key = os.getenv("GOOGLE_AUTH_KEY")
+
+            if not all([api_key, api_secret, user_id, password, google_auth_key]):
+                raise ValueError("Missing required environment variables")
+
+            # Initialize Breeze connection
             self.breeze = BreezeConnect(api_key=api_key)
-            
-            # Load session token from file
-            try:
-                with open("session_token.json", "r") as f:
-                    import json
-                    session_data = json.load(f)
-                    session_token = session_data.get("session_token")
-                    if not session_token:
-                        st.error("Session token not found in file")
-                        return False
-            except Exception as e:
-                st.error(f"Error loading session token: {str(e)}")
-                return False
-            
-            # Connect using session token
-            self.breeze.generate_session(api_secret=api_secret, session_token=session_token)
+            self.breeze.generate_session(api_secret=api_secret,
+                                      session_token=self.breeze.get_session_token())
             self.is_connected = True
             logger.info("Successfully connected to Breeze API")
             return True
-            
+
         except Exception as e:
+            logger.error(f"Error connecting to Breeze API: {str(e)}")
             st.error(f"Error connecting to Breeze API: {str(e)}")
             return False
 
@@ -62,21 +51,19 @@ class OptionDataFetcher:
         """
         Get historical option data
         
-        Args:
+        Parameters:
+        -----------
             strike_price: Strike price of the option
             right: Option type ("call" or "put")
             from_date: Start date in YYYY-MM-DD format
             to_date: End date in YYYY-MM-DD format
             interval: Data interval ("1minute" or "5minute")
-            
+        
         Returns:
-            DataFrame with historical data or None if error
+        --------
+            pandas.DataFrame: Historical data with OHLCV values
         """
         try:
-            if not self.is_connected:
-                if not self.connect():
-                    return None
-
             # Convert dates to API format
             from_datetime = datetime.strptime(from_date, "%Y-%m-%d")
             to_datetime = datetime.strptime(to_date, "%Y-%m-%d") + timedelta(days=1)
@@ -96,28 +83,23 @@ class OptionDataFetcher:
                 exchange_code="NFO",
                 product_type="options",
                 expiry_date=expiry_date_str,
-                right=right.lower(),
+                right=right,
                 strike_price=str(strike_price)
             )
-            
-            if not isinstance(hist_data, dict) or 'Success' not in hist_data or not hist_data['Success']:
-                st.error(f"Failed to get historical data: {hist_data}")
-                return None
-                
+
+            if not hist_data or 'Success' not in hist_data or not hist_data['Success']:
+                raise ValueError("Failed to fetch historical data")
+
             # Convert to DataFrame
             df = pd.DataFrame(hist_data['Success'])
-            if df.empty:
-                st.error("No historical data returned")
-                return None
-                
-            # Convert data types
-            df['datetime'] = pd.to_datetime(df['datetime'])
-            for col in ['open', 'high', 'low', 'close', 'volume', 'open_interest']:
-                df[col] = df[col].astype(float)
-                
-            return df
             
+            # Convert datetime
+            df['datetime'] = pd.to_datetime(df['datetime'])
+            
+            return df
+
         except Exception as e:
+            logger.error(f"Error getting historical data: {str(e)}")
             st.error(f"Error getting historical data: {str(e)}")
             return None
 
@@ -182,56 +164,30 @@ def plot_candlestick(df, title):
                                         low=df['low'],
                                         close=df['close'])])
     
-    # Update layout
     fig.update_layout(
         title=title,
         yaxis_title='Price',
-        xaxis_title='Time',
+        xaxis_title='Date',
         template='plotly_dark',
-        height=800
-    )
-    
-    # Add volume as bar chart on secondary y-axis
-    fig.add_trace(
-        go.Bar(x=df['datetime'], y=df['volume'], name='Volume', yaxis='y2', opacity=0.3)
-    )
-    
-    # Add OI as line on third y-axis
-    fig.add_trace(
-        go.Scatter(x=df['datetime'], y=df['open_interest'], name='Open Interest', yaxis='y3', line=dict(color='yellow'))
-    )
-    
-    # Update layout for multiple y-axes
-    fig.update_layout(
-        yaxis2=dict(
-            title="Volume",
-            overlaying="y",
-            side="right",
-            showgrid=False
-        ),
-        yaxis3=dict(
-            title="Open Interest",
-            overlaying="y",
-            side="right",
-            position=0.95,
-            showgrid=False
-        )
+        height=600
     )
     
     return fig
 
 def main():
-    st.set_page_config(page_title="Option Chain Charts", layout="wide")
-    st.title("Option Chain Candlestick Charts")
+    st.title("Option Chain Historical Charts")
     
-    # Initialize data fetcher
+    # Initialize inputs
     symbol = st.selectbox("Select Symbol", ["NIFTY", "BANKNIFTY"], index=0)
+    
     expiry_date = st.date_input(
         "Expiry Date",
         datetime(2025, 2, 6).date(),
         min_value=datetime(2024, 1, 1).date(),
         max_value=datetime(2025, 12, 31).date()
     )
+    
+    # Initialize data fetcher
     data_fetcher = OptionDataFetcher(symbol, expiry_date)
     
     # Create sidebar inputs
@@ -264,10 +220,10 @@ def main():
         # Interval selection
         interval = st.selectbox("Interval", ["1minute", "5minute"], index=0)
         
-        # Add a fetch button
+        # Fetch button
         fetch_button = st.button("Fetch Data")
 
-    # Main content
+    # Fetch and display data
     if fetch_button:
         with st.spinner('Fetching data...'):
             df = data_fetcher.get_historical_data(
@@ -278,72 +234,15 @@ def main():
                 interval=interval
             )
             
-            if df is not None:
-                # Create title
-                title = f"{symbol} {strike_price} {option_type} ({expiry_date.strftime('%d-%b-%Y')}) - {interval} Chart"
-                
-                # Create and display chart
+            if df is not None and not df.empty:
+                # Create candlestick chart
+                title = f"{symbol} {strike_price} {option_type} ({interval} candles)"
                 fig = plot_candlestick(df, title)
                 st.plotly_chart(fig, use_container_width=True)
                 
                 # Display data table
                 st.subheader("Data Table")
                 st.dataframe(df.sort_values('datetime', ascending=False), use_container_width=True)
-
-    # Add live ATM options chart button
-    if st.button("Show Live ATM Options"):
-        atm_strike = data_fetcher.get_atm_strike()
-        if atm_strike:
-            st.write(f"Current ATM Strike: {atm_strike}")
-            
-            # Create placeholder for live chart
-            chart_placeholder = st.empty()
-            
-            # Initialize data for both CE and PE
-            ce_data = {'time': [], 'price': []}
-            pe_data = {'time': [], 'price': []}
-            
-            # Create figure
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=[], y=[], name='CE', line=dict(color='green')))
-            fig.add_trace(go.Scatter(x=[], y=[], name='PE', line=dict(color='red')))
-            
-            fig.update_layout(
-                title=f"{symbol} ATM {atm_strike} Live Options Chart",
-                xaxis_title="Time",
-                yaxis_title="Price",
-                height=500
-            )
-            
-            # Update function for live data
-            while True:
-                try:
-                    ce_quote, pe_quote = data_fetcher.get_live_atm_data()
-                    if ce_quote and pe_quote:
-                        current_time = datetime.now().strftime("%H:%M:%S")
-                        
-                        # Update CE data
-                        ce_data['time'].append(current_time)
-                        ce_data['price'].append(float(ce_quote['ltp']))
-                        
-                        # Update PE data
-                        pe_data['time'].append(current_time)
-                        pe_data['price'].append(float(pe_quote['ltp']))
-                        
-                        # Update traces
-                        fig.data[0].x = ce_data['time'][-50:]  # Keep last 50 points
-                        fig.data[0].y = ce_data['price'][-50:]
-                        fig.data[1].x = pe_data['time'][-50:]
-                        fig.data[1].y = pe_data['price'][-50:]
-                        
-                        # Update chart
-                        chart_placeholder.plotly_chart(fig, use_container_width=True)
-                        
-                        # Wait for 1 second before next update
-                        time.sleep(1)
-                except Exception as e:
-                    st.error(f"Error updating live data: {e}")
-                    break
 
 if __name__ == "__main__":
     main()
