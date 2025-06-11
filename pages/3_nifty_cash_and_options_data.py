@@ -151,44 +151,19 @@ def main():
                     st.plotly_chart(plot_candlestick(df, "NIFTY Index Cash Chart"), use_container_width=True)
                     st.download_button("Download CSV", df.to_csv(index=False), "nifty_cash.csv", "text/csv")
 
-# --- Valid expiry dates calculation ---
-@st.cache_data
-def get_valid_expiry_dates_2025():
-    holiday_strs = [
-        "2025-02-26", "2025-03-14", "2025-03-31", "2025-04-10",
-        "2025-04-14", "2025-04-18", "2025-05-01", "2025-08-15",
-        "2025-08-27", "2025-10-02", "2025-10-21", "2025-10-22",
-        "2025-11-05", "2025-12-25"
-    ]
-    holidays = set(pd.to_datetime(holiday_strs))
-    all_thursdays = pd.date_range(start="2025-01-01", end="2025-12-31", freq="W-THU")
+    # --- Tab 2: Options Chain ---
+    with tab2:
+        st.subheader("Options Chain Candlestick Chart")
+        symbol = st.selectbox("Symbol", ["NIFTY", "BANKNIFTY"])
+        strike_price = st.number_input("Strike Price", value=25000, step=50)
+        option_type = st.radio("Option Type", ["CE", "PE"], horizontal=True)
+        expiry = st.date_input("Expiry Date", datetime.today() + timedelta(days=7))
+        from_date_opt = st.date_input("From Date", datetime.today() - timedelta(days=1), key="opt_from")
+        to_date_opt = st.date_input("To Date", datetime.today(), key="opt_to")
+        interval_opt = st.selectbox("Interval", ["1second", "1minute", "5minute"], index=1)
 
-    valid_expiries = []
-    for thursday in all_thursdays:
-        if thursday in holidays:
-            valid_expiries.append(thursday - timedelta(days=1))  # Previous day
-        else:
-            valid_expiries.append(thursday)
-    return valid_expiries
-
-# Use dropdown for expiry date
-valid_expiries = get_valid_expiry_dates_2025()
-expiry = st.selectbox("Select Expiry Date", valid_expiries, index=valid_expiries.index(min(filter(lambda d: d >= datetime.today().date(), valid_expiries))))
-
-
-# --- Tab 2: Options Chain ---
-with tab2:
-    st.subheader("Options Chain Candlestick Chart")
-    symbol = st.selectbox("Symbol", ["NIFTY", "BANKNIFTY"])
-    strike_price = st.number_input("Strike Price", value=25000, step=50)
-    option_type = st.radio("Option Type", ["CE", "PE"], horizontal=True)
-    #expiry = st.date_input("Expiry Date", datetime.today() + timedelta(days=7))
-    from_date_opt = st.date_input("From Date", datetime.today() - timedelta(days=1), key="opt_from")
-    to_date_opt = st.date_input("To Date", datetime.today(), key="opt_to")
-    interval_opt = st.selectbox("Interval", ["1second", "1minute", "5minute"], index=1)
-
-    if st.button("Fetch Options Data"):
-        with st.spinner("Fetching options data..."):
+        if st.button("Fetch Options Data"):
+            with st.spinner("Fetching options data..."):
                 df_opt = get_options_data(
                     breeze, symbol, strike_price,
                     right="call" if option_type == "CE" else "put",
