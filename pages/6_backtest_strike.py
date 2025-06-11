@@ -22,41 +22,13 @@ if data_file_ce and data_file_pe:
     df_pe = pd.read_csv(data_file_pe)
 else:
     st.info("No files uploaded. Fetching data from Breeze API, saving to CSV, then running backtest.")
-    import os
-    import json
-    from datetime import timedelta
-    from breeze_connect import BreezeConnect
-    from dotenv import load_dotenv
-
     # User input for option details
     symbol = st.text_input("Symbol", value="NIFTY")
     expiry_str = st.text_input("Expiry Date (YYYY-MM-DD)")
     from_date = st.date_input("From Date", value=pd.to_datetime("2025-06-11"))
     to_date = st.date_input("To Date", value=pd.to_datetime("2025-06-11"))
     interval = st.selectbox("Interval", ["1minute", "5minute", "15minute"], index=0)
-
-    # --- Nifty Cash Data Fetcher ---
-    def fetch_nifty_cash_data(breeze, from_date, to_date, interval):
-        response = breeze.get_historical_data_v2(
-            interval=interval,
-            from_date=from_date.strftime("%Y-%m-%dT07:00:00.000Z"),
-            to_date=(to_date + timedelta(days=1)).strftime("%Y-%m-%dT07:00:00.000Z"),
-            stock_code="NIFTY",
-            exchange_code="NSE",
-            product_type="cash"
-        )
-        df = pd.DataFrame(response["Success"])
-        if 'datetime' not in df.columns:
-            st.error("No 'datetime' in Nifty cash response!")
-            st.json(response["Success"])
-            return None
-        df['datetime'] = pd.to_datetime(df['datetime'])
-        for col in ['open', 'high', 'low', 'close', 'volume']:
-            if col in df.columns:
-                df[col] = df[col].astype(float)
-            else:
-                df[col] = 0.0
-        return df
+    stop_loss_percentage = st.number_input("Stop Loss Percentage", min_value=0.0, value=80.0)
 
     # Only fetch if expiry is filled
     if expiry_str:
@@ -119,11 +91,6 @@ else:
         df_ce = pd.read_csv("ce_data.csv")
         df_pe = pd.read_csv("pe_data.csv")
 
-    def breeze_connect_from_env():
-        load_dotenv()
-        api_key = os.getenv("API_KEY")
-        api_secret = os.getenv("API_SECRET")
-        session_token = None
         if os.path.exists("session_token.json"):
             with open("session_token.json", "r") as f:
                 session_token = json.load(f).get("session_token")
