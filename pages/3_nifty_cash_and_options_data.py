@@ -155,7 +155,7 @@ def main():
     with tab2:
         st.subheader("Options Chain Candlestick Chart")
         symbol = st.selectbox("Symbol", ["NIFTY", "BANKNIFTY"])
-        strike_price = st.number_input("Strike Price", value=23400, step=50)
+        strike_price = st.number_input("Strike Price", value=25000, step=50)
         option_type = st.radio("Option Type", ["CE", "PE"], horizontal=True)
         expiry = st.date_input("Expiry Date", datetime.today() + timedelta(days=7))
         from_date_opt = st.date_input("From Date", datetime.today() - timedelta(days=1), key="opt_from")
