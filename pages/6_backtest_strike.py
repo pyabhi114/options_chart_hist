@@ -34,7 +34,7 @@ else:
     if expiry_str:
         try:
             expiry_date = pd.to_datetime(expiry_str)
-            breeze = breeze_connect_from_env()
+            breeze = connect_breeze()
             if breeze:
                 # Fetch Nifty cash data for ATM/OTM/ITM calculation
                 with st.spinner("Fetching Nifty cash data for strike selection..."):
