@@ -21,10 +21,12 @@ if data_file_ce and data_file_pe:
     df_ce = pd.read_csv(data_file_ce)
     df_pe = pd.read_csv(data_file_pe)
 else:
-    st.info("No files uploaded. Fetching data using Breeze API (from app.py functions). Please provide the required option details below.")
-    import sys
-    sys.path.append('.')  # Ensure current directory is in path
-    from app import connect_breeze, get_options_data
+    st.info("No files uploaded. Fetching data from Breeze API, saving to CSV, then running backtest.")
+    import os
+    import json
+    from datetime import timedelta
+    from breeze_connect import BreezeConnect
+    from dotenv import load_dotenv
 
     # User input for option details
     symbol = st.text_input("Symbol", value="NIFTY")
@@ -34,22 +36,62 @@ else:
     to_date = st.date_input("To Date", value=pd.to_datetime("2025-06-11"))
     interval = st.selectbox("Interval", ["1minute", "5minute", "15minute"], index=0)
 
+    def breeze_connect_from_env():
+        load_dotenv()
+        api_key = os.getenv("API_KEY")
+        api_secret = os.getenv("API_SECRET")
+        session_token = None
+        if os.path.exists("session_token.json"):
+            with open("session_token.json", "r") as f:
+                session_token = json.load(f).get("session_token")
+        breeze = BreezeConnect(api_key=api_key)
+        breeze.generate_session(api_secret=api_secret, session_token=session_token)
+        return breeze
+
+    def fetch_option_data(breeze, symbol, strike_price, right, expiry_date, from_date, to_date, interval):
+        response = breeze.get_historical_data_v2(
+            interval=interval,
+            from_date=from_date.strftime("%Y-%m-%dT07:00:00.000Z"),
+            to_date=(to_date + timedelta(days=1)).strftime("%Y-%m-%dT07:00:00.000Z"),
+            stock_code=symbol,
+            exchange_code="NFO",
+            product_type="options",
+            expiry_date=expiry_date.strftime("%Y-%m-%dT07:00:00.000Z"),
+            right=right,
+            strike_price=str(strike_price)
+        )
+        df = pd.DataFrame(response["Success"])
+        if 'datetime' not in df.columns:
+            st.error("No 'datetime' in API response!")
+            st.json(response["Success"])
+            return None
+        df['datetime'] = pd.to_datetime(df['datetime'])
+        for col in ['open', 'high', 'low', 'close', 'volume', 'open_interest']:
+            if col in df.columns:
+                df[col] = df[col].astype(float)
+            else:
+                df[col] = 0.0
+        return df
+
     # Only fetch if expiry is filled
     if expiry_str:
         try:
             expiry_date = pd.to_datetime(expiry_str)
-            breeze = connect_breeze()
+            breeze = breeze_connect_from_env()
             if breeze:
-                with st.spinner("Fetching CE data..."):
-                    df_ce = get_options_data(
-                        breeze, symbol, strike_price, "call", expiry_date, from_date, to_date, interval
-                    )
-                with st.spinner("Fetching PE data..."):
-                    df_pe = get_options_data(
-                        breeze, symbol, strike_price, "put", expiry_date, from_date, to_date, interval
-                    )
+                with st.spinner("Fetching CE data and saving to ce_data.csv..."):
+                    df_ce = fetch_option_data(breeze, symbol, strike_price, "call", expiry_date, from_date, to_date, interval)
+                    if df_ce is not None:
+                        df_ce.to_csv("ce_data.csv", index=False)
+                        st.success("CE data saved to ce_data.csv!")
+                with st.spinner("Fetching PE data and saving to pe_data.csv..."):
+                    df_pe = fetch_option_data(breeze, symbol, strike_price, "put", expiry_date, from_date, to_date, interval)
+                    if df_pe is not None:
+                        df_pe.to_csv("pe_data.csv", index=False)
+                        st.success("PE data saved to pe_data.csv!")
+                # Reload for backtest if both succeeded
                 if df_ce is not None and df_pe is not None:
-                    st.success("Data fetched for both CE and PE.")
+                    st.success("Data ready for backtest!")
                 else:
                     st.error("Failed to fetch both CE and PE data. Check API credentials and parameters.")
             else:
@@ -58,6 +100,11 @@ else:
             st.error(f"Error parsing expiry date or fetching data: {e}")
     else:
         st.warning("Please enter all option details to fetch data.")
+
+    # If CSVs exist, load them for backtest
+    if os.path.exists("ce_data.csv") and os.path.exists("pe_data.csv"):
+        df_ce = pd.read_csv("ce_data.csv")
+        df_pe = pd.read_csv("pe_data.csv")
 
 # Ensure datetime column is datetime type
 df_ce["datetime"] = pd.to_datetime(df_ce["datetime"])
