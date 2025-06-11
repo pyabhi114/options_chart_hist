@@ -157,7 +157,15 @@ def main():
         symbol = st.selectbox("Symbol", ["NIFTY", "BANKNIFTY"])
         strike_price = st.number_input("Strike Price", value=25000, step=50)
         option_type = st.radio("Option Type", ["CE", "PE"], horizontal=True)
-        expiry = st.date_input("Expiry Date", datetime.today() + timedelta(days=7))
+        
+        # Calculate current week's Thursday
+        today = datetime.today()
+        days_ahead = 3 - today.weekday()  # Thursday is weekday 3
+        if days_ahead <= 0:  # If today is Friday, Saturday, or Sunday
+            days_ahead += 7  # Get next week's Thursday
+        current_thursday = today + timedelta(days=days_ahead)
+        
+        expiry = st.date_input("Expiry Date", current_thursday)
         from_date_opt = st.date_input("From Date", datetime.today() - timedelta(days=1), key="opt_from")
         to_date_opt = st.date_input("To Date", datetime.today(), key="opt_to")
         interval_opt = st.selectbox("Interval", ["1second", "1minute", "5minute"], index=1)
