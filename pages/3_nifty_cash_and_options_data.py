@@ -95,15 +95,30 @@ def get_options_data(breeze, symbol, strike_price, right, expiry_date, from_date
             strike_price=str(strike_price)
         )
 
+        # Safety check: valid structure and non-empty list
+        if not isinstance(response, dict) or 'Success' not in response or not response['Success']:
+            st.warning("No data returned or invalid structure.")
+            return None
+
         df = pd.DataFrame(response["Success"])
+        if 'datetime' not in df.columns:
+            st.error("Error: 'datetime' field is missing in API response.")
+            st.json(response["Success"])  # Helps debugging
+            return None
+
         df['datetime'] = pd.to_datetime(df['datetime'])
         for col in ['open', 'high', 'low', 'close', 'volume', 'open_interest']:
-            df[col] = df[col].astype(float)
+            if col in df.columns:
+                df[col] = df[col].astype(float)
+            else:
+                df[col] = 0.0  # Add missing columns with default
+
         return df
 
     except Exception as e:
         st.error(f"Error fetching Options data: {e}")
         return None
+
 
 # --- Streamlit UI ---
 def main():
