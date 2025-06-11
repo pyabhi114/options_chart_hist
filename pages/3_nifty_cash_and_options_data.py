@@ -176,19 +176,19 @@ valid_expiries = get_valid_expiry_dates_2025()
 expiry = st.selectbox("Select Expiry Date", valid_expiries, index=valid_expiries.index(min(filter(lambda d: d >= datetime.today().date(), valid_expiries))))
 
 
-    # --- Tab 2: Options Chain ---
-    with tab2:
-        st.subheader("Options Chain Candlestick Chart")
-        symbol = st.selectbox("Symbol", ["NIFTY", "BANKNIFTY"])
-        strike_price = st.number_input("Strike Price", value=25000, step=50)
-        option_type = st.radio("Option Type", ["CE", "PE"], horizontal=True)
-        #expiry = st.date_input("Expiry Date", datetime.today() + timedelta(days=7))
-        from_date_opt = st.date_input("From Date", datetime.today() - timedelta(days=1), key="opt_from")
-        to_date_opt = st.date_input("To Date", datetime.today(), key="opt_to")
-        interval_opt = st.selectbox("Interval", ["1second", "1minute", "5minute"], index=1)
+# --- Tab 2: Options Chain ---
+with tab2:
+    st.subheader("Options Chain Candlestick Chart")
+    symbol = st.selectbox("Symbol", ["NIFTY", "BANKNIFTY"])
+    strike_price = st.number_input("Strike Price", value=25000, step=50)
+    option_type = st.radio("Option Type", ["CE", "PE"], horizontal=True)
+    #expiry = st.date_input("Expiry Date", datetime.today() + timedelta(days=7))
+    from_date_opt = st.date_input("From Date", datetime.today() - timedelta(days=1), key="opt_from")
+    to_date_opt = st.date_input("To Date", datetime.today(), key="opt_to")
+    interval_opt = st.selectbox("Interval", ["1second", "1minute", "5minute"], index=1)
 
-        if st.button("Fetch Options Data"):
-            with st.spinner("Fetching options data..."):
+    if st.button("Fetch Options Data"):
+        with st.spinner("Fetching options data..."):
                 df_opt = get_options_data(
                     breeze, symbol, strike_price,
                     right="call" if option_type == "CE" else "put",
