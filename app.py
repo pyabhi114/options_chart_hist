@@ -187,7 +187,7 @@ def main():
         st.header("Chart Settings")
         
         # Symbol selection
-        symbol = st.selectbox("Select Symbol", ["NIFTY", "BANKNIFTY", "VIX"], index=0)
+        symbol = st.selectbox("Select Symbol", ["NIFTY", "BANKNIFTY"], index=0)
         
         # Date range selection
         col1, col2 = st.columns(2)
