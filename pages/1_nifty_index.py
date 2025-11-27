@@ -41,7 +41,7 @@ def get_nifty_cash_data(breeze, from_date, to_date, interval):
             interval=interval,
             from_date=from_str,
             to_date=to_str,
-            stock_code="VIX",
+            stock_code="INDVIX",
             exchange_code="NSE",
             product_type="cash"
         )
