@@ -41,7 +41,7 @@ def get_nifty_cash_data(breeze, from_date, to_date, interval):
             interval=interval,
             from_date=from_str,
             to_date=to_str,
-            stock_code="NIFTY",
+            stock_code="INDVIX",
             exchange_code="NSE",
             product_type="cash"
         )
@@ -107,7 +107,7 @@ def main():
     to_date = st.date_input("To Date", datetime.today())
     interval = st.selectbox("Interval", ["1minute", "5minute", "1second"], index=0)
 
-    if st.button("Fetch NIFTY Cash Data"):
+    if st.button("Fetch INDIA VIX Data"):
         with st.spinner("Connecting to Breeze API..."):
             breeze = connect_breeze()
             if breeze:
