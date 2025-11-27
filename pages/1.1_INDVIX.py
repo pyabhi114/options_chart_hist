@@ -101,7 +101,7 @@ def plot_candlestick(df, title):
     return fig
 
 def main():
-    st.title("📈 NIFTY Index Data Downloader")
+    st.title("📈 INDIA VIX Data Downloader")
 
     from_date = st.date_input("From Date", datetime.today() - timedelta(days=1))
     to_date = st.date_input("To Date", datetime.today())
