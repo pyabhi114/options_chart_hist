@@ -66,7 +66,7 @@ class OptionDataFetcher:
             expiry_date: Expiry date in YYYY-MM-DD format
             from_date: Start date in YYYY-MM-DD format
             to_date: End date in YYYY-MM-DD format
-            interval: Data interval ("1second", "1minute" or "5minute")
+            interval: Data interval ("1second", "1minute" , "3minute" or "5minute")
             
         Returns:
             DataFrame with historical data or None if error
@@ -87,7 +87,7 @@ class OptionDataFetcher:
             expiry_date_str = expiry_datetime.strftime("%Y-%m-%dT07:00:00.000Z")
             
             # Validate interval
-            valid_intervals = ["1second", "1minute", "5minute"]
+            valid_intervals = ["1second", "1minute", "3minute","5minute"]
             if interval not in valid_intervals:
                 st.error(f"Invalid interval. Must be one of: {', '.join(valid_intervals)}")
                 return None
@@ -223,7 +223,7 @@ def main():
         )
         
         # Interval selection
-        interval = st.selectbox("Interval", ["1second", "1minute", "5minute"], index=1)
+        interval = st.selectbox("Interval", ["1second", "1minute", "3minute","5minute"], index=1)
         
         # Add a fetch button
         fetch_button = st.button("Fetch Data")
